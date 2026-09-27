@@ -115,7 +115,7 @@ function Proposta() {
               <tr key={`l${i}`} className="border-b border-border">
                 <td className="py-1.5">Laje{l.descricao && ` — ${l.descricao}`}</td>
                 <td className="py-1.5 text-right tabular-nums">
-                  {num(l.comprimento)} m × {num(l.largura)} m
+                  {l.area > 0 ? "—" : `${num(l.comprimento)} m × ${num(l.largura)} m`}
                 </td>
                 <td className="py-1.5 text-right tabular-nums">{num(areaLaje(l))} m²</td>
               </tr>

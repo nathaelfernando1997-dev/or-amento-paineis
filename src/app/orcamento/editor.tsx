@@ -12,10 +12,11 @@ import {
   type CalculoPainel,
 } from "@/lib/calculo";
 import { salvar, type Status } from "@/lib/store";
+import { LeitorProjeto, type Levantamento } from "./leitor-projeto";
 
 /* Os campos numéricos ficam como texto enquanto o usuário digita ("2,8"). */
 type ParedeUI = { descricao: string; comprimento: string; altura: string };
-type LajeUI = { descricao: string; comprimento: string; largura: string };
+type LajeUI = { descricao: string; comprimento: string; largura: string; area: string };
 
 const toNum = (s: string) => {
   const t = s.trim();
@@ -59,6 +60,7 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
       descricao: l.descricao,
       comprimento: toStr(l.comprimento),
       largura: toStr(l.largura),
+      area: toStr(l.area),
     })),
   );
   const [precoPainel, setPrecoPainel] = useState(toStr(c0.precoPainel));
@@ -77,6 +79,7 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
       descricao: l.descricao.trim(),
       comprimento: toNum(l.comprimento),
       largura: toNum(l.largura),
+      area: toNum(l.area),
     })),
     precoPainel: toNum(precoPainel),
     incluirCinza,
@@ -87,6 +90,25 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
   const preco = calculo.precoPainel;
   const precoForaDaFaixa =
     preco > 0 && (preco < PRECO_PAINEL_MIN || preco > PRECO_PAINEL_MAX);
+
+  function aplicarLevantamento(l: Levantamento) {
+    setParedes(
+      l.paredes.map((p) => ({
+        descricao: p.descricao,
+        comprimento: toStr(p.comprimento),
+        altura: toStr(p.altura),
+      })),
+    );
+    setLajes(
+      l.lajes.map((x) => ({
+        descricao: x.descricao,
+        comprimento: toStr(x.comprimento),
+        largura: toStr(x.largura),
+        area: toStr(x.area),
+      })),
+    );
+    if (l.areaConstruida) setAreaConstruida(toStr(l.areaConstruida));
+  }
 
   function onSalvar(depois: "lista" | "proposta") {
     if (!cliente.trim() && !referencia.trim()) {
@@ -105,7 +127,7 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
       calculo: {
         ...calculo,
         paredes: calculo.paredes.filter((p) => p.descricao || p.comprimento),
-        lajes: calculo.lajes.filter((l) => l.descricao || l.comprimento || l.largura),
+        lajes: calculo.lajes.filter((l) => l.descricao || l.comprimento || l.largura || l.area),
       },
     });
     router.push(depois === "proposta" ? `/orcamento/imprimir?id=${id}` : "/");
@@ -124,6 +146,8 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
+          <LeitorProjeto onAplicar={aplicarLevantamento} />
+
           {/* ------------------------------------------------- Cliente */}
           <Card className="grid gap-3 sm:grid-cols-2">
             <Field label="Cliente" htmlFor="cliente">
@@ -228,24 +252,24 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
               </p>
             </div>
             <div className="space-y-2">
-              <div className="hidden grid-cols-[1fr_100px_100px_90px_32px] gap-2 text-xs font-medium text-muted sm:grid">
+              <div className="hidden grid-cols-[1fr_90px_90px_100px_32px] gap-2 text-xs font-medium text-muted sm:grid">
                 <span>Descrição</span>
-                <span>Comprimento (m)</span>
+                <span>Compr. (m)</span>
                 <span>Largura (m)</span>
-                <span className="text-right">Área</span>
+                <span>Área (m²)</span>
                 <span />
               </div>
               {lajes.map((l, i) => (
                 <div
                   key={i}
-                  className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 border-b border-border pb-2 sm:grid-cols-[1fr_100px_100px_90px_32px] sm:border-0 sm:pb-0"
+                  className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 border-b border-border pb-2 sm:grid-cols-[1fr_90px_90px_100px_32px] sm:border-0 sm:pb-0"
                 >
                   <Input
                     aria-label="Descrição da laje"
                     placeholder="Ex.: Laje térreo"
                     value={l.descricao}
                     onChange={(e) => setLajes(set(lajes, i, { descricao: e.target.value }))}
-                    className="col-span-2 sm:col-span-1"
+                    className="col-span-3 sm:col-span-1"
                   />
                   <RemoveBtn
                     onClick={() => setLajes(lajes.filter((_, j) => j !== i))}
@@ -265,20 +289,26 @@ export function Editor({ inicial }: { inicial: EditorInicial }) {
                     value={l.largura}
                     onChange={(e) => setLajes(set(lajes, i, { largura: e.target.value }))}
                   />
-                  <span className="text-right text-sm font-semibold tabular-nums">
-                    {num(toNum(l.comprimento) * toNum(l.largura))} m²
-                  </span>
+                  <Input
+                    aria-label="Área"
+                    inputMode="decimal"
+                    // Sem área digitada, mostra (e usa) comprimento × largura.
+                    placeholder={num(toNum(l.comprimento) * toNum(l.largura)) + " m²"}
+                    value={l.area}
+                    onChange={(e) => setLajes(set(lajes, i, { area: e.target.value }))}
+                    className="font-semibold"
+                  />
                 </div>
               ))}
             </div>
             <p className="mt-2 text-xs text-muted">
-              Já tem a área da laje? Coloque a área no comprimento e 1 na largura.
+              Já tem a área da laje? Digite direto em Área — ela vale no lugar de comprimento × largura.
             </p>
             <Button
               variant="secondary"
               size="sm"
               className="mt-3"
-              onClick={() => setLajes([...lajes, { descricao: "", comprimento: "", largura: "" }])}
+              onClick={() => setLajes([...lajes, { descricao: "", comprimento: "", largura: "", area: "" }])}
             >
               + Laje
             </Button>

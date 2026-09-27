@@ -2,7 +2,7 @@
  * Orçamento de painéis (paredes + lajes) e da parte cinza.
  *
  *   m² de paredes = Σ (metro linear × altura)
- *   m² de lajes   = Σ (comprimento × largura)
+ *   m² de lajes   = Σ área (informada, ou comprimento × largura)
  *   painéis       = (m² paredes + m² lajes) × preço do m² (R$ 250 a 290)
  *   parte cinza   = área construída × R$ 700
  *   total         = painéis + parte cinza
@@ -23,6 +23,7 @@ export interface LajeLinha {
   descricao: string;
   comprimento: number; // m
   largura: number; // m
+  area: number; // m² — quando informada, vale no lugar de comprimento × largura
 }
 
 export interface CalculoPainel {
@@ -47,7 +48,8 @@ export interface ResultadoPainel {
 const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
 export const areaParede = (p: ParedeLinha) => n(p.comprimento) * n(p.altura);
-export const areaLaje = (l: LajeLinha) => n(l.comprimento) * n(l.largura);
+export const areaLaje = (l: LajeLinha) =>
+  n(l.area) > 0 ? n(l.area) : n(l.comprimento) * n(l.largura);
 
 export function calcularPainel(c: CalculoPainel): ResultadoPainel {
   const metroLinear = c.paredes.reduce((a, p) => a + n(p.comprimento), 0);
@@ -70,7 +72,7 @@ export function calcularPainel(c: CalculoPainel): ResultadoPainel {
 export function calculoVazio(): CalculoPainel {
   return {
     paredes: [{ descricao: "", comprimento: 0, altura: 2.8 }],
-    lajes: [{ descricao: "", comprimento: 0, largura: 0 }],
+    lajes: [{ descricao: "", comprimento: 0, largura: 0, area: 0 }],
     precoPainel: PRECO_PAINEL_PADRAO,
     incluirCinza: true,
     areaConstruida: 0,
@@ -96,6 +98,7 @@ export function parseCalculo(raw: unknown): CalculoPainel | null {
           descricao: String(l?.descricao ?? ""),
           comprimento: n(l?.comprimento),
           largura: n(l?.largura),
+          area: n(l?.area),
         }))
       : base.lajes,
     precoPainel: n(r.precoPainel) || base.precoPainel,
